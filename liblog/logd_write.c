@@ -143,11 +143,29 @@ int __android_log_write(int prio, const char *tag, const char *msg)
     /* XXX: This needs to go! */
     if (!strcmp(tag, "HTC_RIL") ||
         !strcmp(tag, "RILJ") ||
+        !strcmp(tag, "RILB") ||
         !strcmp(tag, "RILC") ||
         !strcmp(tag, "RIL") ||
         !strcmp(tag, "AT") ||
         !strcmp(tag, "GSM") ||
-        !strcmp(tag, "STK"))
+        !strcmp(tag, "STK") ||
+        !strcmp(tag, "gsm.ServiceStateTracker") ||
+        !strcmp(tag, "CDMA") ||
+        !strcmp(tag, "cdma.CallTracker") ||
+        !strcmp(tag, "cdma.ServiceStateTracker") ||
+        !strcmp(tag, "RuimFileHandler") ||
+        !strcmp(tag, "RuimPhoneBookInterfaceManager") ||
+        !strcmp(tag, "RuimRecords") ||
+        !strcmp(tag, "RuimSmsInterfaceManager") ||
+        !strcmp(tag, "PhoneProxy") ||
+        !strcmp(tag, "IccRecordsBase") ||
+        !strcmp(tag, "PhoneBase") ||
+        !strcmp(tag, "CallerInfoAsyncQuery") ||
+        !strcmp(tag, "PhoneFactory") ||
+        !strcmp(tag, "PhoneStateIntRecv") ||
+        !strcmp(tag, "AdnRecordLoader") ||
+        !strcmp(tag, "CallTrackerBase") ||
+        !strcmp(tag, "ServiceState"))
             log_id = LOG_ID_RADIO;
 
     vec[0].iov_base   = (unsigned char *) &prio;
