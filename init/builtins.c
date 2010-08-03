@@ -30,6 +30,7 @@
 #include <sys/mount.h>
 #include <sys/resource.h>
 #include <linux/loop.h>
+#include <poll.h>
 
 #include "init.h"
 #include "keywords.h"
@@ -164,9 +165,32 @@ int do_domainname(int nargs, char **args)
     return write_file("/proc/sys/kernel/domainname", args[1]);
 }
 
+/*exec <path> <arg1> <arg2> ... */
+#define MAX_PARAMETERS 64
 int do_exec(int nargs, char **args)
 {
-    return -1;
+    pid_t pid;
+    int status, i, j;
+    char *par[MAX_PARAMETERS];
+    if (nargs > MAX_PARAMETERS)
+    {
+        return -1;
+    }
+    for(i=0, j=1; i<(nargs-1) ;i++,j++)
+    {
+        par[i] = args[j];
+    }
+    par[i] = (char*)0;
+    pid = fork();
+    if (!pid)
+    {
+        execv(par[0],par);
+    }
+    else
+    {
+        while(wait(&status)!=pid);
+    }
+    return 0;
 }
 
 int do_export(int nargs, char **args)
@@ -571,4 +595,52 @@ int do_device(int nargs, char **args) {
     add_devperms_partners(source, get_mode(args[2]), decode_uid(args[3]),
                           decode_uid(args[4]), prefix);
     return 0;
+}
+
+int do_devwait(int nargs, char **args) {
+
+    int dev_fd, uevent_fd, rc, timeout = DEVWAIT_TIMEOUT;
+    struct pollfd ufds[1];
+
+    uevent_fd = open_uevent_socket();
+
+    ufds[0].fd = uevent_fd;
+    ufds[0].events = POLLIN;
+
+    for(;;) {
+
+        dev_fd = open(args[1], O_RDONLY);
+	if (dev_fd < 0) {
+	    if (errno != ENOENT) {
+                ERROR("%s: open failed with error %d\n", __func__, errno);
+                rc = -errno;
+		break;
+            }
+	} else {
+	    return 0;
+	}
+
+        ufds[0].revents = 0;
+
+        rc = poll(ufds, 1, DEVWAIT_POLL_TIME);
+        if (rc == 0)
+            continue;
+	else if (rc < 0) {
+	        ERROR("%s: poll request failed for file: %s\n", __func__, args[1]);
+		break;
+	}
+
+	if (timeout > 0)
+		timeout -= DEVWAIT_POLL_TIME;
+	else {
+		ERROR("%s: timed out waiting on file: %s\n", __func__, args[1]);
+		rc = -ETIME;
+		break;
+	}
+
+        if (ufds[0].revents == POLLIN)
+            handle_device_fd(uevent_fd);
+    }
+
+    return rc;
 }
