@@ -260,6 +260,12 @@ on boot
     setprop net.tcp.buffersize.edge    4093,26280,35040,4096,16384,35040
     setprop net.tcp.buffersize.gprs    4092,8760,11680,4096,8760,11680
 
+    # import a local init file
+    import /system/etc/init.gem.rc
+
+    # run our custom init
+    exec /system/bin/sysinit
+
     class_start default
 
 ## Daemon processes to be run by init.
@@ -358,9 +364,6 @@ service pbap /system/bin/sdptool add --channel=19 PBAP
 
 service installd /system/bin/installd
     socket installd stream 600 system system
-
-service flash_recovery /system/etc/install-recovery.sh
-    oneshot
 
 service racoon /system/bin/racoon
     socket racoon stream 600 system system
