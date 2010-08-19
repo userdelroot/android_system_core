@@ -261,10 +261,10 @@ on boot
     setprop net.tcp.buffersize.gprs    4092,8760,11680,4096,8760,11680
 
     # import a local init file
-    import /system/etc/geminit.rc
+    import /system/etc/init.gem.rc
 
     # run our custom init
-    exec /system/bin/geminit
+    exec /system/bin/sysinit
 
     class_start default
 
