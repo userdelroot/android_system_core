@@ -7,7 +7,7 @@ ifeq ($(filter $(BOARD_HIJACK_EXECUTABLES),logwrapper),)
 LOCAL_MODULE := logwrapper
 else
 LOCAL_MODULE := logwrapper.bin
-fi
+endif
 
 LOCAL_STATIC_LIBRARIES := liblog
 include $(BUILD_EXECUTABLE)
