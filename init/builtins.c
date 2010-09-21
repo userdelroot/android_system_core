@@ -308,7 +308,7 @@ int do_mount(int nargs, char **args)
     char *source, *target, *system;
     char *options = NULL;
     unsigned flags = 0;
-    int n, i;
+    int n, p, i;
 
     for (n = 4; n < nargs; n++) {
         for (i = 0; mount_flags[i].name; i++) {
@@ -334,6 +334,23 @@ int do_mount(int nargs, char **args)
         }
 
         sprintf(tmp, "/dev/block/mtdblock%d", n);
+
+        if (mount(tmp, target, system, flags, options) < 0) {
+            return -1;
+        }
+
+        return 0;
+    } else if (!strncmp(source, "mmc@", 4)) {
+        n = mmc_name_to_number(source + 4);
+        if (n < 0) {
+            return -1;
+        }
+        p = mmc_name_to_partition(source + 4);
+        if (p < 0) {
+            return -1;
+        }
+
+        sprintf(tmp, "/dev/block/mmcblk%dp%d", n, p);
 
         if (mount(tmp, target, system, flags, options) < 0) {
             return -1;

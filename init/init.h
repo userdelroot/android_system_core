@@ -18,6 +18,8 @@
 #define _INIT_INIT_H
 
 int mtd_name_to_number(const char *name);
+int mmc_name_to_number(const char *name);
+int mmc_name_to_partition(const char *name);
 
 void handle_control_message(const char *msg, const char *arg);
 

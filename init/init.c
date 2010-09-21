@@ -487,13 +487,21 @@ void handle_control_message(const char *msg, const char *arg)
 }
 
 #define MAX_MTD_PARTITIONS 16
+#define MAX_MMC_PARTITIONS 64
 
 static struct {
     char name[16];
     int number;
 } mtd_part_map[MAX_MTD_PARTITIONS];
 
+static struct {
+    char name[16];
+    int number;
+    int partition;
+} mmc_part_map[MAX_MMC_PARTITIONS];
+
 static int mtd_part_count = -1;
+static int mmc_part_count = -1;
 
 static void find_mtd_partitions(void)
 {
@@ -543,6 +551,51 @@ static void find_mtd_partitions(void)
     close(fd);
 }
 
+static void find_mmc_partitions(void)
+{
+    int fd;
+    char buf[4096];
+    char *pmmcbufp;
+    ssize_t pmmcsize;
+    int r;
+
+    fd = open("/proc/partitions", O_RDONLY);
+    if (fd < 0)
+        return;
+
+    buf[sizeof(buf) - 1] = '\0';
+    pmmcsize = read(fd, buf, sizeof(buf) - 1);
+    pmmcbufp = buf;
+    while (pmmcsize > 0) {
+        int mmcnum, mmcpart, mmcmaj, mmcmin, mmcsize;
+        char mmcname[16];
+        mmcname[0] = '\0';
+        mmcnum = mmcpart = -1;
+        r = sscanf(pmmcbufp, " %d %d %d mmcblk%dp%d %15s ",
+                   &mmcmaj, &mmcmin, &mmcsize, &mmcnum, &mmcpart, mmcname);
+        if ((r == 6) && (atoi(mmcname) == 0)) {
+            INFO("mmc drive %d, partition %d, %s\n", mmcnum, mmcpart, mmcname);
+            if (mmc_part_count < MAX_MMC_PARTITIONS) {
+                strcpy(mmc_part_map[mmc_part_count].name, mmcname);
+                mmc_part_map[mmc_part_count].number = mmcnum;
+                mmc_part_map[mmc_part_count].partition = mmcpart;
+                mmc_part_count++;
+            } else {
+                ERROR("too many mmc partitions\n");
+            }
+        }
+        while (pmmcsize > 0 && *pmmcbufp != '\n') {
+            pmmcbufp++;
+            pmmcsize--;
+        }
+        if (pmmcsize > 0) {
+            pmmcbufp++;
+            pmmcsize--;
+        }
+    }
+    close(fd);
+}
+
 int mtd_name_to_number(const char *name) 
 {
     int n;
@@ -553,6 +606,36 @@ int mtd_name_to_number(const char *name)
     for (n = 0; n < mtd_part_count; n++) {
         if (!strcmp(name, mtd_part_map[n].name)) {
             return mtd_part_map[n].number;
+        }
+    }
+    return -1;
+}
+
+int mmc_name_to_number(const char *name) 
+{
+    int n;
+    if (mmc_part_count < 0) {
+        mmc_part_count = 0;
+        find_mmc_partitions();
+    }
+    for (n = 0; n < mmc_part_count; n++) {
+        if (!strcmp(name, mmc_part_map[n].name)) {
+            return mmc_part_map[n].number;
+        }
+    }
+    return -1;
+}
+
+int mmc_name_to_partition(const char *name) 
+{
+    int n;
+    if (mmc_part_count < 0) {
+        mmc_part_count = 0;
+        find_mmc_partitions();
+    }
+    for (n = 0; n < mmc_part_count; n++) {
+        if (!strcmp(name, mmc_part_map[n].name)) {
+            return mmc_part_map[n].partition;
         }
     }
     return -1;
