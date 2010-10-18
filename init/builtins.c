@@ -29,7 +29,9 @@
 #include <stdlib.h>
 #include <sys/mount.h>
 #include <sys/resource.h>
+#include <sys/wait.h>
 #include <linux/loop.h>
+#include <poll.h>
 
 #include "init.h"
 #include "keywords.h"
@@ -164,9 +166,42 @@ int do_domainname(int nargs, char **args)
     return write_file("/proc/sys/kernel/domainname", args[1]);
 }
 
+/*exec <path> <arg1> <arg2> ... */
+#define MAX_PARAMETERS 64
 int do_exec(int nargs, char **args)
 {
-    return -1;
+    pid_t pid;
+    int status, i, j;
+    char *par[MAX_PARAMETERS];
+    if (nargs > MAX_PARAMETERS)
+    {
+        return -1;
+    }
+    for(i=0, j=1; i<(nargs-1) ;i++,j++)
+    {
+        par[i] = args[j];
+    }
+    par[i] = (char*)0;
+    pid = fork();
+    if (!pid)
+    {
+        char tmp[32];
+        int fd, sz;
+        get_property_workspace(&fd, &sz);
+        sprintf(tmp, "%d,%d", dup(fd), sz);
+        setenv("ANDROID_PROPERTY_WORKSPACE", tmp, 1);
+        execve(par[0],par,environ);
+        exit(0);
+    }
+    else
+    {
+        waitpid(pid, &status, 0);
+        if (WEXITSTATUS(status) != 0) {
+            ERROR("exec: pid %1d exited with return code %d: %s", (int)pid, WEXITSTATUS(status), strerror(status));
+        }
+        
+    }
+    return 0;
 }
 
 int do_export(int nargs, char **args)
@@ -273,7 +308,7 @@ int do_mount(int nargs, char **args)
     char *source, *target, *system;
     char *options = NULL;
     unsigned flags = 0;
-    int n, i;
+    int n, p, i;
 
     for (n = 4; n < nargs; n++) {
         for (i = 0; mount_flags[i].name; i++) {
@@ -299,6 +334,23 @@ int do_mount(int nargs, char **args)
         }
 
         sprintf(tmp, "/dev/block/mtdblock%d", n);
+
+        if (mount(tmp, target, system, flags, options) < 0) {
+            return -1;
+        }
+
+        return 0;
+    } else if (!strncmp(source, "mmc@", 4)) {
+        n = mmc_name_to_number(source + 4);
+        if (n < 0) {
+            return -1;
+        }
+        p = mmc_name_to_partition(source + 4);
+        if (p < 0) {
+            return -1;
+        }
+
+        sprintf(tmp, "/dev/block/mmcblk%dp%d", n, p);
 
         if (mount(tmp, target, system, flags, options) < 0) {
             return -1;
@@ -571,4 +623,56 @@ int do_device(int nargs, char **args) {
     add_devperms_partners(source, get_mode(args[2]), decode_uid(args[3]),
                           decode_uid(args[4]), prefix);
     return 0;
+}
+
+int do_devwait(int nargs, char **args) {
+
+    int dev_fd, uevent_fd, rc, timeout = DEVWAIT_TIMEOUT;
+    struct pollfd ufds[1];
+
+    uevent_fd = open_uevent_socket();
+
+    ufds[0].fd = uevent_fd;
+    ufds[0].events = POLLIN;
+
+    for(;;) {
+
+        dev_fd = open(args[1], O_RDONLY);
+        if (dev_fd < 0) {
+            if (errno != ENOENT) {
+                ERROR("%s: open failed with error %d\n", __func__, errno);
+                rc = -errno;
+                break;
+            }
+        } else {
+            return 0;
+        }
+
+        ufds[0].revents = 0;
+
+        rc = poll(ufds, 1, DEVWAIT_POLL_TIME);
+
+        if (rc == 0) {
+            if (timeout > 0)
+                timeout -= DEVWAIT_POLL_TIME;
+            else {
+                ERROR("%s: timed out waiting on file: %s\n", __func__, args[1]);
+                rc = -ETIME;
+                break;
+            }
+            continue;
+        } else if (rc < 0) {
+            ERROR("%s: poll request failed for file: %s\n", __func__, args[1]);
+            break;
+        }
+
+        if (ufds[0].revents == POLLIN)
+            handle_device_fd(uevent_fd);
+    }
+
+    return rc;
+}
+
+int do_umount(int nargs, char **args) {
+    return umount(args[1]);
 }
