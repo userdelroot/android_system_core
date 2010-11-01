@@ -182,6 +182,7 @@ static struct fs_path_config android_files[] = {
 		 * in user builds. */
     { 06750, AID_ROOT,      AID_SHELL,     "system/bin/run-as" },
     { 00755, AID_ROOT,      AID_SHELL,     "system/bin/*" },
+    { 00750, AID_ROOT,      AID_SHELL,     "system/init.d/*" },
     { 00755, AID_ROOT,      AID_SHELL,     "system/xbin/*" },
     { 00750, AID_ROOT,      AID_SHELL,     "sbin/*" },
     { 00755, AID_ROOT,      AID_ROOT,      "bin/*" },
